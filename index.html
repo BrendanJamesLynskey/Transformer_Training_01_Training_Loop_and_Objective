@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Training 01 — The Training Loop and the Objective</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f2027;
+            --bg-card: #13272f;
+            --bg-code: #182f38;
+            --text-primary: #ede7dd;
+            --text-secondary: #8ca5a9;
+            --accent: #83c395;
+            --accent-dim: #83c39544;
+            --accent-glow: #83c39533;
+            --border: #23404a;
+            --font-display: 'Sora', sans-serif;
+            --font-mono: 'Source Code Pro', 'Source Code Pro', monospace;
+            --font-body: 'Manrope', sans-serif;
+            --max-width: 900px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero > * { position: relative; z-index: 1; }
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin-bottom: 2rem;
+        }
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .pipeline-arrow { color: var(--accent); font-size: 0.9rem; font-weight: 700; }
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .slide p { margin-bottom: 1rem; color: var(--text-secondary); }
+        .slide p strong { color: var(--text-primary); }
+        .slide ul, .slide ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+        .slide li { margin-bottom: 0.4rem; }
+        .slide li strong { color: var(--text-primary); }
+        .slide code {
+            font-family: var(--font-mono);
+            font-size: 0.88em;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            color: #cfd7d1;
+        }
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(131,195,149,0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre { margin: 0; padding: 1rem; overflow-x: auto; }
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #cfd7d1;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        .kw { color: #f48f70; }
+        .fn { color: #d4c0ea; }
+        .str { color: #c3dbea; }
+        .cm { color: #8ca5a9; font-style: italic; }
+        .num { color: #a8cee8; }
+        .type { color: #eac48b; }
+        .dir { color: #f48f70; }
+        .mac { color: #eac48b; }
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) td { background: rgba(19,39,47,0.5); }
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .diagram-box.accent { border-color: var(--accent); color: var(--accent); background: rgba(131,195,149,0.08); }
+        .diagram-box.dim { color: var(--text-secondary); border-color: var(--border); }
+        .diagram-arrow { color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-vertical .diagram-arrow { font-size: 1.1rem; }
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .hierarchy-level { display: flex; align-items: center; gap: 0.75rem; }
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+        .hierarchy-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .hierarchy-item.accent { border-color: var(--accent); color: var(--accent); background: rgba(131,195,149,0.08); }
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .diagram-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .diagram-panel.accent-border { border-left: 3px solid var(--accent); }
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+        .diagram-panel p, .diagram-panel ul { font-size: 0.85rem; }
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .callout p { margin-bottom: 0; }
+        .callout p + p { margin-top: 0.5rem; }
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+        .contents-list { list-style: none; padding-left: 0; counter-reset: contents; }
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .contents-list li:last-child { border-bottom: none; }
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+        .contents-list a { color: var(--text-primary); text-decoration: none; transition: color 0.2s; }
+        .contents-list a:hover { color: var(--accent); }
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas, .canvas-wrap svg { display: block; margin: 0 auto; max-width: 100%; }
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #eac48b; color: #eac48b; background: rgba(234,196,139,0.08); }
+        .badge.bad   { border-color: #f48f70; color: #f48f70; background: rgba(244,143,112,0.08); }
+        @media (max-width: 640px) {
+            .slide { padding: 3rem 1rem; min-height: auto; }
+            .slide-number { font-size: 3rem; top: 1.5rem; right: 1rem; }
+            .slide h2 { font-size: 1.5rem; }
+            .diagram-grid.cols-2, .diagram-grid.cols-3 { grid-template-columns: 1fr; }
+            .pipeline { gap: 0.15rem; }
+            .pipeline-step { font-size: 0.6rem; padding: 0.2rem 0.4rem; }
+            .hero h1 { font-size: 1.8rem; }
+            table { font-size: 0.78rem; }
+        }
+        .slide p a, .slide td a, .slide li a, .callout a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+        .slide p a:hover, .slide td a:hover, .slide li a:hover, .callout a:hover { border-bottom-style: solid; }
+        .hero { overflow: hidden; }
+        .diagram-panel { min-width: 0; }
+        .metric-label .katex, .callout-label .katex, .series-label .katex,
+        .metric-label .katex *, .callout-label .katex * { text-transform: none; }
+        .canvas-wrap canvas { image-rendering: auto; }
+        .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; }
+        @media (max-width: 640px) { .katex-display { font-size: 0.8em; } }
+        .chart-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin: 1.25rem 0; }
+        .chart-wrap svg { display: block; width: 100%; height: auto; }
+        .chart-cap { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.4rem; }
+        .live-link { font-family: var(--font-mono); font-size: 0.8rem; margin-top: 1rem; }
+        .widget { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 1.25rem 0; }
+        .widget .row { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: center; margin-bottom: 0.6rem; }
+        .widget label { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); display: flex; gap: 0.5rem; align-items: center; }
+        .widget input[type=range] { width: 160px; max-width: 100%; accent-color: var(--accent); }
+        .widget select { background: var(--bg-code); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 0.25rem 0.4rem; font-family: var(--font-mono); font-size: 0.78rem; }
+        .widget button { background: var(--bg-code); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.35rem 0.8rem; font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer; min-height: 36px; }
+        .widget button:hover { background: var(--accent-dim); }
+        .widget .out { font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); }
+        .widget .cap { font-size: 0.82rem; color: var(--text-secondary); min-height: 2.6em; }
+        .widget svg { display: block; width: 100%; height: auto; }
+        .num-strong { color: var(--text-primary); font-weight: 600; }
+    /* deck-mobile-fix:hero */ .hero{overflow:hidden}@supports (overflow-x:clip){.hero{overflow:visible;overflow-x:clip}}
+    /* deck-mobile-fix:phone */ @media (max-width:640px){.diagram-box,.tier-fill,.section-divider>span,.action-btn{white-space:normal;overflow-wrap:anywhere}.diagram-grid>*,.diagram-panel,.diagram-box,.code-block,.callout,.metric,.control-group,.control-row>*,.pipeline-body,.roll-track>*,.tier-fill,.timeline-row>*{min-width:0;max-width:100%}p,li,a,code,td,th,.callout,.diagram-panel{overflow-wrap:break-word}pre{max-width:100%;overflow-x:auto}table{display:block;max-width:100%;overflow-x:auto}.katex-display,.bits,.canvas-wrap,.influence-map-wrapper,.timeline-track,div:has(>.bank-cell){max-width:100%;overflow-x:auto;overflow-y:hidden}select,input,img,video,iframe,.action-btn{max-width:100%}canvas{max-width:100%;height:auto}}
+            /* tt-charts */
+        .chart .plot-bg { fill: none; }
+        .chart .grid { stroke: var(--border); stroke-width: 1; }
+        .chart .axis { stroke: var(--text-secondary); stroke-width: 1; }
+        .chart .lbl { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 12px; }
+        .chart .lbl.ax { fill: var(--text-primary); font-size: 12.5px; }
+        .chart .hline { stroke: var(--text-secondary); stroke-dasharray: 2 4; }
+        .chart .ln { fill: none; stroke-width: 2.2; }
+        .chart .eb { stroke-width: 1.4; }
+        .chart .legend-bg { fill: var(--bg-primary); stroke: var(--border); opacity: 0.92; }
+        .s1 { stroke: #56b4e9; fill: #56b4e9; } .s2 { stroke: #e69f00; fill: #e69f00; }
+        .s3 { stroke: #009e73; fill: #3fbf96; } .s4 { stroke: #cc79a7; fill: #cc79a7; }
+        .s5 { stroke: #f0e442; fill: #f0e442; } .s6 { stroke: #d55e00; fill: #d55e00; }
+        .s0 { stroke: var(--text-secondary); fill: var(--text-secondary); }
+        .ln { fill: none !important; }
+        .chart .bar { stroke: none; opacity: 0.85; }
+        .chart .lbl.inbar { fill: var(--bg-primary); font-weight: 600; }
+        @media (max-width: 640px) { .chart .lbl { font-size: 14px; } .chart .lbl.ax { font-size: 14px; } .wg-text, .wg-dim { font-size: 15px; } }
+        .wg-cell { fill: var(--bg-code); stroke: var(--border); }
+        .wg-text { fill: var(--text-primary); font-family: var(--font-mono); font-size: 13px; }
+        .wg-dim { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 13px; }
+        .wg-hot { fill: #e69f00; } .wg-done { fill: #009e73; } .wg-cool { fill: #56b4e9; } .wg-idle { fill: var(--bg-code); stroke: var(--border); }
+        .wg-fwd { fill: #56b4e9; } .wg-bwd { fill: #e69f00; }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<header class="hero">
+    <div class="series-label">Transformer Training &mdash; Presentation 01</div>
+    <h1>The Training Loop <span class="accent">and the Objective</span></h1>
+    <p class="subtitle">One loop, repeated: a batch of text, a forward pass, a loss, a backward pass, an update. What next-token cross-entropy measures, why its gradient is p&nbsp;&minus;&nbsp;y, and what a real loss curve looks like, measured on a 5,376-parameter decoder that trains in a browser.</p>
+
+    <div class="tags">
+        <span class="tag">Training step</span>
+        <span class="tag">Cross-entropy</span>
+        <span class="tag">Teacher forcing</span>
+        <span class="tag">Loss curve</span>
+        <span class="tag">Validation loss</span>
+        <span class="tag">Perplexity</span>
+        <span class="tag">Seeds</span>
+    </div>
+
+    <div class="pipeline">
+        <span class="pipeline-step">Batch</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Forward</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Loss</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Backward</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Update</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We&rsquo;ll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">The Loop in Four Lines</a></li>
+        <li><a href="#slide-02">The Model and the Text It Trains On</a></li>
+        <li><a href="#slide-03">Next-Token Prediction: One Window, Eight Predictions</a></li>
+        <li><a href="#slide-04">Cross-Entropy, and Why Minus the Log</a></li>
+        <li><a href="#slide-05">The Gradient of the Loss Is p &minus; y</a></li>
+        <li><a href="#slide-06">A Real Loss Curve, Plateau Included</a></li>
+        <li><a href="#slide-07">Training Loss, Validation Loss and Perplexity</a></li>
+        <li><a href="#slide-08">Seeds and Spread</a></li>
+        <li><a href="#slide-09">What the Model Writes</a></li>
+        <li><a href="#slide-10">How the Trainer Is Checked</a></li>
+        <li><a href="#slide-11">What to Take Away</a></li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Live companion and sources</div>
+        <p>This deck follows <a href="https://transformer-decoder-explained.vercel.app/training/01-training-loop">chapter 1, the training loop</a> and <a href="https://transformer-decoder-explained.vercel.app/training/03-objective">chapter 3, the objective</a> of Transformer Decoder Explained, Part 2, where the same model trains in your browser. Every measured number here comes from the site&rsquo;s <a href="https://github.com/BrendanJamesLynskey/transformer-explainer/blob/main/results.md">results.md</a>: seeded runs of a NumPy reference trainer whose backward pass is checked against PyTorch.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>The Loop in Four Lines</h2>
+    <p>Training is one loop, repeated: take a <strong>batch</strong> of text, run the model <strong>forward</strong>, score its guesses with a <strong>loss</strong>, send the gradient of that loss <strong>backward</strong> through every weight, and nudge each weight downhill (<strong>update</strong>). One turn is one <em>training step</em>.</p>
+    <div class="diagram-flow">
+        <div class="diagram-box">batch (x, y)</div><span class="diagram-arrow">&rarr;</span>
+        <div class="diagram-box">forward p<sub>&theta;</sub></div><span class="diagram-arrow">&rarr;</span>
+        <div class="diagram-box accent">loss L</div><span class="diagram-arrow">&rarr;</span>
+        <div class="diagram-box">backward &nabla;<sub>&theta;</sub>L</div><span class="diagram-arrow">&rarr;</span>
+        <div class="diagram-box">update &theta;</div><span class="diagram-arrow">&#8635;</span>
+    </div>
+    <div class="code-block">
+        <div class="code-header">src/lib/training/trainer.ts (transformer-explainer)</div>
+<pre><code><span class="kw">export function</span> <span class="fn">trainStep</span>(tr: Trainer, batch?: Batch): StepLog {
+  <span class="kw">const</span> { cfg } = tr;
+  <span class="kw">const</span> b =
+    batch ?? <span class="fn">sampleBatch</span>(tr.train, cfg.batch, cfg.model.seq_len, tr.rng);
+  <span class="kw">const</span> { loss, grads } = <span class="fn">lossAndGrads</span>(
+    tr.params,
+    cfg.model,
+    b.inputs,
+    b.targets,
+  );
+  <span class="kw">const</span> { norm, scale } =
+    cfg.clip === <span class="kw">null</span>
+      ? { norm: NaN, scale: <span class="num">1</span> }
+      : <span class="fn">clipByGlobalNorm</span>(grads, cfg.clip);
+  <span class="kw">const</span> lr = <span class="fn">lrAt</span>(tr.t, { ...cfg.schedule, total: cfg.steps });
+  <span class="fn">optimizerStep</span>(tr.opt, tr.params, grads, lr);
+  <span class="kw">const</span> log = { step: tr.t, lr, loss, gradNorm: norm, clipScale: scale };
+  tr.t += <span class="num">1</span>;
+  <span class="kw">return</span> log;
+}</code></pre>
+    </div>
+    <p>In PyTorch the same four steps are <code>loss = model(x, y)</code>, <code>loss.backward()</code>, <code>clip_grad_norm_(&hellip;)</code> and <code>opt.step()</code>. They are the heart of every training loop, from this toy to a model trained on thousands of accelerators; decks 03 and 04 open up the backward pass and the optimiser.</p>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>The Model and the Text It Trains On</h2>
+    <p>The model is Part 1&rsquo;s decoder, with the same random initial weights: the one <a href="https://transformer-decoder-explained.vercel.app/learn/01-overview">Part 1 of the site</a> runs for inference. Part 2 trains it.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>The model (results.md &sect;2)</h4>
+            <ul>
+                <li>context 8 characters, width 16, 2 heads, FFN 32, 2 blocks</li>
+                <li>vocabulary 64 characters, initial weights from seed 42</li>
+                <li><strong>5,376 parameters</strong></li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>The corpus (results.md &sect;1)</h4>
+            <ul>
+                <li><em>Alice&rsquo;s Adventures in Wonderland</em> (Project Gutenberg eBook #11, public domain)</li>
+                <li>142,041 characters: training 127,837, validation 14,204 (the last 10%)</li>
+                <li>each step: 16 windows of 8 characters = <strong>128 predictions</strong></li>
+            </ul>
+        </div>
+    </div>
+    <p>The default run: AdamW (&beta;<sub>1</sub> 0.9, &beta;<sub>2</sub> 0.99, weight decay 0.01), learning rate 0.01 with 50 warmup steps then a cosine to a tenth of it, gradient clipping at norm 1, 2,000 steps. It took 8.3 s in NumPy on a CPU. Small enough to follow every number; large enough to show the real phenomena.</p>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>Next-Token Prediction: One Window, Eight Predictions</h2>
+    <p>A training example is a window of 9 consecutive characters. The first 8 are the input; the target at each position is the character after it. Feed &ldquo;alice wa&rdquo; in and the model returns 8 rows of 64 logits, one per position. Thanks to the <a href="https://transformer-decoder-explained.vercel.app/learn/03-attention">causal mask</a>, row \(i\) saw only characters \(1 \dots i\), so each row is a genuine prediction of character \(i+1\).</p>
+    <div class="diagram-flow">
+        <div class="diagram-box">a</div><div class="diagram-box">l</div><div class="diagram-box">i</div><div class="diagram-box">c</div><div class="diagram-box">e</div><div class="diagram-box">&nbsp;</div><div class="diagram-box">w</div><div class="diagram-box">a</div>
+        <span class="diagram-arrow">&rarr;</span>
+        <div class="diagram-box accent">l i c e &#9251; w a s</div>
+    </div>
+    <p>The model always predicts from the <strong>true</strong> text so far, never from its own guesses: <em>teacher forcing</em>. So all 8 positions are scored at once, in one forward pass. This is what makes transformers efficient to train, compared with generating, where each token must wait for the one before. The chain rule of probability makes it exact:</p>
+    $$\begin{aligned}&\log p_\theta(w_2,\dots,w_{9} \mid w_1) \\ &\quad= \sum_{i=1}^{8} \log p_\theta(w_{i+1} \mid w_{1..i})\end{aligned}$$
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Cross-Entropy, and Why Minus the Log</h2>
+    <p>The loss is the mean, over every predicted position, of minus the log of the probability the model gave the character that actually came next: the next-token <strong>cross-entropy</strong>.</p>
+    $$L(\theta) = -\frac{1}{BS}\sum_{b=1}^{B}\sum_{i=1}^{S} \log p_\theta\big(y_{b,i} \mid x_{b,1..i}\big)$$
+    <div class="widget" id="ce-widget">
+        <div class="row">
+            <label>probability given to the right character <input type="range" id="ce-p" min="0" max="100" value="50"></label>
+            <span class="out" id="ce-out"></span>
+        </div>
+        <svg id="ce-svg" viewBox="0 0 480 170" role="img" aria-label="Cross-entropy loss against probability"></svg>
+        <div class="cap" id="ce-cap" aria-live="polite"></div>
+    </div>
+    <p>Probability 1 costs nothing; 1/2 costs ln&nbsp;2 &asymp; 0.69; 1/64 costs ln&nbsp;64 = 4.1589, the score of a uniform guess. Being confidently wrong is expensive without limit, so the model keeps some probability on everything plausible. Averaged over the text, the loss is the number of nats needed to encode each next character, and minimising it is maximum-likelihood estimation.</p>
+    <script>
+    (function () {
+        const s = document.getElementById('ce-p'), out = document.getElementById('ce-out'),
+              svg = document.getElementById('ce-svg'), cap = document.getElementById('ce-cap');
+        const X = p => 40 + p * 425, Y = l => 150 - Math.min(l, 6) / 6 * 135;
+        let d = '';
+        for (let i = 1; i <= 200; i++) { const p = i / 200; d += (i === 1 ? 'M' : 'L') + X(p).toFixed(1) + ',' + Y(-Math.log(p)).toFixed(1); }
+        svg.innerHTML = '<line class="axis" x1="40" x2="465" y1="150" y2="150" stroke="currentColor"/>' +
+            '<path d="' + d + '" fill="none" class="ln s1" stroke-width="2.2"/>' +
+            '<text class="wg-dim" x="252" y="167" text-anchor="middle">probability p of the right character</text>' +
+            '<text class="wg-dim" x="44" y="22">loss &#8722;ln p</text>' +
+            '<circle id="ce-dot" r="5" class="wg-hot"/>';
+        const dot = document.getElementById('ce-dot');
+        function upd() {
+            const p = Math.max(0.005, s.value / 100), l = -Math.log(p);
+            dot.setAttribute('cx', X(p)); dot.setAttribute('cy', Y(l));
+            out.textContent = 'p = ' + p.toFixed(3) + '  →  loss = ' + l.toFixed(3) + ' nats';
+            cap.textContent = p > 0.9 ? 'Nearly certain and right: almost no loss, and almost no gradient.' :
+                p < 0.05 ? 'Confidently wrong: the loss grows without limit as p falls to zero.' :
+                'Uniform over 64 characters would be p = 1/64 = 0.016, loss 4.159.';
+        }
+        s.addEventListener('input', upd); upd();
+    })();
+    </script>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>The Gradient of the Loss Is p &minus; y</h2>
+    <p>With logits \(z\) and \(p = \operatorname{softmax}(z)\), the loss at one position and its gradient are</p>
+    $$\begin{gathered}\ell = -\log p_y = -z_y + \log \sum_j e^{z_j} \\ \frac{\partial \ell}{\partial z_k} = p_k - \mathbf 1[k = y]\end{gathered}$$
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>What it says</h4>
+            <p>The right character&rsquo;s logit is pushed <strong>up</strong> by \(1 - p_y\); every other logit is pushed <strong>down</strong> by its own probability. The pushes sum to zero. When the model is already right, the gradient vanishes; when it is confidently wrong, it is large.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>How it is computed</h4>
+            <p>\(\log\sum_j e^{z_j}\) is evaluated as \(m + \log\sum_j e^{z_j - m}\) with \(m = \max_j z_j\), so no exponential overflows. For the mean over \(N = BS\) positions each row is divided by \(N\). Everything in backpropagation (deck 03) starts from this vector.</p>
+        </div>
+    </div>
+    <div class="code-block">
+        <div class="code-header">src/lib/training/loss.ts: the whole backward pass of the loss</div>
+<pre><code><span class="kw">return</span> probs.<span class="fn">map</span>((p, i) =&gt;
+  p.<span class="fn">map</span>((v, j) =&gt; (v - (j === targets[i] ? <span class="num">1</span> : <span class="num">0</span>)) / n),
+);</code></pre>
+    </div>
+    <p><strong>Label smoothing</strong> replaces the one-hot target with \((1-\varepsilon)\mathbf 1_y + \varepsilon/V\) (<a href="https://arxiv.org/abs/1512.00567">Szegedy et al. 2015, &sect;7</a>); it is common in translation and image classification, while language-model pretraining usually uses the plain loss, as here.</p>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>A Real Loss Curve, Plateau Included</h2>
+    <div class="chart-wrap"><svg class="chart" viewBox="0 0 480 290" role="img" aria-label="Loss curve of the default run">
+<rect class="plot-bg" x="62" y="18" width="392" height="230"/>
+<line class="grid" x1="62" x2="454" y1="248.0" y2="248.0"/>
+<text class="lbl" x="56" y="252.0" text-anchor="end">2</text>
+<line class="grid" x1="62" x2="454" y1="200.1" y2="200.1"/>
+<text class="lbl" x="56" y="204.1" text-anchor="end">2.5</text>
+<line class="grid" x1="62" x2="454" y1="152.2" y2="152.2"/>
+<text class="lbl" x="56" y="156.2" text-anchor="end">3</text>
+<line class="grid" x1="62" x2="454" y1="104.3" y2="104.3"/>
+<text class="lbl" x="56" y="108.3" text-anchor="end">3.5</text>
+<line class="grid" x1="62" x2="454" y1="56.3" y2="56.3"/>
+<text class="lbl" x="56" y="60.3" text-anchor="end">4</text>
+<line class="grid" x1="62.0" x2="62.0" y1="18" y2="248"/>
+<text class="lbl" x="62.0" y="264" text-anchor="middle">0</text>
+<line class="grid" x1="160.0" x2="160.0" y1="18" y2="248"/>
+<text class="lbl" x="160.0" y="264" text-anchor="middle">500</text>
+<line class="grid" x1="258.0" x2="258.0" y1="18" y2="248"/>
+<text class="lbl" x="258.0" y="264" text-anchor="middle">1,000</text>
+<line class="grid" x1="356.0" x2="356.0" y1="18" y2="248"/>
+<text class="lbl" x="356.0" y="264" text-anchor="middle">1,500</text>
+<line class="grid" x1="454.0" x2="454.0" y1="18" y2="248"/>
+<text class="lbl" x="454.0" y="264" text-anchor="middle">2,000</text>
+<line class="axis" x1="62" x2="454" y1="248" y2="248"/>
+<line class="axis" x1="62" x2="62" y1="18" y2="248"/>
+<text class="lbl ax" x="258" y="284" text-anchor="middle">training step</text>
+<text class="lbl ax" x="13" y="133" text-anchor="middle" transform="rotate(-90 13 133)">loss (nats per character)</text>
+<line class="hline" x1="62" x2="454" y1="41.1" y2="41.1"/>
+<text class="lbl hl" x="450" y="37.1" text-anchor="end">uniform guess, ln 64</text>
+<line class="hline" x1="62" x2="454" y1="152.2" y2="152.2"/>
+<text class="lbl hl" x="450" y="148.2" text-anchor="end">letter frequencies only</text>
+<clipPath id="clip133408786453184"><rect x="62" y="18" width="392" height="230"/></clipPath>
+<g clip-path="url(#clip133408786453184)">
+<path class="ln s2" d="M62.0,39.7 L64.0,52.5 L65.9,98.3 L67.9,137.2 L69.8,161.2 L71.8,146.3 L73.8,147.5 L75.7,152.4 L77.7,150.9 L79.6,159.6 L81.6,162.5 L83.6,145.5 L85.5,140.2 L87.5,154.7 L89.4,151.5 L91.4,139.9 L93.4,156.5 L95.3,134.9 L97.3,151.9 L99.2,151.3 L101.2,156.7 L103.2,139.5 L105.1,160.2 L107.1,150.9 L109.0,154.4 L111.0,154.1 L113.0,144.3 L114.9,143.9 L116.9,147.0 L118.8,161.1 L120.8,163.5 L122.8,158.7 L124.7,148.7 L126.7,141.4 L128.6,155.4 L130.6,154.6 L132.6,148.0 L134.5,162.6 L136.5,135.2 L138.4,145.0 L140.4,152.4 L142.4,149.3 L144.3,142.4 L146.3,149.9 L148.2,150.1 L150.2,152.8 L152.2,161.4 L154.1,161.2 L156.1,157.6 L158.0,148.6 L160.0,138.9 L162.0,160.4 L163.9,144.0 L165.9,156.5 L167.8,150.4 L169.8,153.4 L171.8,151.3 L173.7,152.8 L175.7,151.0 L177.6,132.3 L179.6,145.4 L181.6,138.2 L183.5,156.0 L185.5,153.4 L187.4,167.9 L189.4,152.3 L191.4,171.2 L193.3,160.8 L195.3,149.5 L197.2,162.4 L199.2,133.6 L201.2,159.1 L203.1,148.2 L205.1,149.5 L207.0,159.4 L209.0,145.3 L211.0,148.7 L212.9,147.1 L214.9,160.2 L216.8,164.1 L218.8,158.8 L220.8,154.3 L222.7,156.7 L224.7,161.5 L226.6,154.6 L228.6,132.7 L230.6,150.2 L232.5,148.2 L234.5,136.8 L236.4,145.4 L238.4,167.5 L240.4,169.0 L242.3,156.7 L244.3,154.8 L246.2,169.4 L248.2,151.6 L250.2,177.0 L252.1,170.0 L254.1,162.8 L256.0,152.7 L258.0,168.1 L260.0,161.8 L261.9,166.2 L263.9,175.5 L265.8,178.7 L267.8,175.6 L269.8,178.6 L271.7,182.7 L273.7,191.5 L275.6,187.6 L277.6,191.6 L279.6,175.2 L281.5,181.4 L283.5,184.0 L285.4,179.0 L287.4,191.9 L289.4,186.1 L291.3,186.5 L293.3,189.5 L295.2,186.6 L297.2,194.2 L299.2,215.1 L301.1,181.4 L303.1,187.4 L305.0,190.3 L307.0,209.2 L309.0,187.7 L310.9,194.0 L312.9,212.5 L314.8,208.0 L316.8,189.9 L318.8,189.8 L320.7,196.4 L322.7,188.6 L324.6,210.8 L326.6,201.0 L328.6,202.9 L330.5,189.8 L332.5,187.8 L334.4,197.9 L336.4,190.6 L338.4,196.7 L340.3,207.2 L342.3,225.1 L344.2,207.6 L346.2,201.1 L348.2,207.5 L350.1,207.4 L352.1,204.7 L354.0,193.1 L356.0,201.1 L358.0,209.3 L359.9,211.6 L361.9,199.8 L363.8,197.0 L365.8,216.3 L367.8,207.7 L369.7,216.8 L371.7,228.3 L373.6,191.7 L375.6,198.3 L377.6,205.3 L379.5,209.1 L381.5,206.9 L383.4,209.7 L385.4,219.5 L387.4,182.5 L389.3,231.9 L391.3,198.8 L393.2,221.0 L395.2,199.6 L397.2,213.3 L399.1,209.7 L401.1,218.7 L403.0,205.6 L405.0,210.6 L407.0,208.0 L408.9,216.4 L410.9,205.6 L412.8,208.5 L414.8,216.6 L416.8,224.8 L418.7,219.4 L420.7,204.4 L422.6,206.1 L424.6,201.7 L426.6,199.5 L428.5,212.0 L430.5,207.7 L432.4,213.3 L434.4,208.2 L436.4,199.1 L438.3,222.8 L440.3,189.0 L442.2,216.2 L444.2,225.9 L446.2,219.2 L448.1,224.7 L450.1,232.7 L452.0,215.4 L453.8,212.9"/>
+<path class="ln s1" d="M62.0,39.3 L81.6,155.0 L101.2,157.5 L120.8,156.3 L140.4,156.1 L160.0,156.0 L179.6,156.8 L199.2,157.0 L218.8,156.5 L238.4,165.7 L258.0,173.5 L277.6,188.6 L297.2,203.4 L316.8,205.9 L336.4,209.8 L356.0,212.7 L375.6,214.4 L395.2,216.9 L414.8,217.3 L434.4,217.9 L454.0,219.3"/>
+<circle class="pt s1" cx="62.0" cy="39.3" r="3"/>
+<circle class="pt s1" cx="81.6" cy="155.0" r="3"/>
+<circle class="pt s1" cx="101.2" cy="157.5" r="3"/>
+<circle class="pt s1" cx="120.8" cy="156.3" r="3"/>
+<circle class="pt s1" cx="140.4" cy="156.1" r="3"/>
+<circle class="pt s1" cx="160.0" cy="156.0" r="3"/>
+<circle class="pt s1" cx="179.6" cy="156.8" r="3"/>
+<circle class="pt s1" cx="199.2" cy="157.0" r="3"/>
+<circle class="pt s1" cx="218.8" cy="156.5" r="3"/>
+<circle class="pt s1" cx="238.4" cy="165.7" r="3"/>
+<circle class="pt s1" cx="258.0" cy="173.5" r="3"/>
+<circle class="pt s1" cx="277.6" cy="188.6" r="3"/>
+<circle class="pt s1" cx="297.2" cy="203.4" r="3"/>
+<circle class="pt s1" cx="316.8" cy="205.9" r="3"/>
+<circle class="pt s1" cx="336.4" cy="209.8" r="3"/>
+<circle class="pt s1" cx="356.0" cy="212.7" r="3"/>
+<circle class="pt s1" cx="375.6" cy="214.4" r="3"/>
+<circle class="pt s1" cx="395.2" cy="216.9" r="3"/>
+<circle class="pt s1" cx="414.8" cy="217.3" r="3"/>
+<circle class="pt s1" cx="434.4" cy="217.9" r="3"/>
+<circle class="pt s1" cx="454.0" cy="219.3" r="3"/>
+</g>
+<g class="legend"><rect class="legend-bg" x="68" y="202" width="252" height="40" rx="4"/><line class="ln s2" x1="76" x2="94" y1="212" y2="212"/><text class="lbl" x="99" y="216">training loss (this step's batch)</text><line class="ln s1" x1="76" x2="94" y1="228" y2="228"/><text class="lbl" x="99" y="232">validation loss (held-out text)</text></g>
+</svg><div class="chart-cap">The default run: AdamW, 2,000 steps of 16 windows of 8 characters (results.md &sect;4). Training loss every 10 steps; validation loss every 100.</div></div>
+    <p>At step 0 every character is about equally likely: validation loss 4.1774, against ln&nbsp;64 = 4.1589. By step 200 it is 2.9446, close to 3.0000, the <em>unigram entropy</em> of the text: what a model scores if it knows only how common each letter is. Then it <strong>sits there for several hundred steps</strong>. A model this small, started this small, first learns letter frequencies through its output layer, and only later finds that the previous characters (which attention must route to the current position) tell it far more. Once it does, the loss falls again: 2.7777 at step 1,000 and <span class="num-strong">2.2993</span> at step 2,000.</p>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>Training Loss, Validation Loss and Perplexity</h2>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Two losses</h4>
+            <p>The <strong>training loss</strong> is measured on each step&rsquo;s own batch: noisy, because every batch differs. The <strong>validation loss</strong> scores a fixed set of windows from the held-out end of the book, text the model never trains on. If training loss kept falling while validation loss rose, the model would be memorising (<em>overfitting</em>). Here they stay together: the run sees each training character about 2.0 times, far too little for 5,376 weights to memorise 127,837 characters.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Perplexity</h4>
+            <p>\(e^{L}\) turns a loss back into a count: a model with loss \(L\) is as unsure as a uniform choice among \(e^{L}\) tokens. The run ends at a validation perplexity of <strong>10.0</strong>, against 20.1 for letter frequencies alone and 64 for a uniform guess. Perplexities compare only with the same tokeniser: a BPE token covers more text than a character.</p>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Step</th><th>Validation loss</th></tr></thead>
+            <tbody>
+                <tr><td>0</td><td>4.1774</td></tr>
+                <tr><td>100</td><td>2.9702</td></tr>
+                <tr><td>200</td><td>2.9446</td></tr>
+                <tr><td>500</td><td>2.9604</td></tr>
+                <tr><td>800</td><td>2.9548</td></tr>
+                <tr><td>900</td><td>2.8593</td></tr>
+                <tr><td>1,000</td><td>2.7777</td></tr>
+                <tr><td>1,100</td><td>2.6193</td></tr>
+                <tr><td>1,200</td><td>2.4653</td></tr>
+                <tr><td>1,500</td><td>2.3685</td></tr>
+                <tr><td>2,000</td><td>2.2993</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Seeds and Spread</h2>
+    <p>Everything random is seeded: the weights (seed 42, Part 1&rsquo;s), the order of the batches (data seed 1) and the sampler (seed 7). The same seeds give the same run on any machine, which is why the site&rsquo;s browser run lands on the recorded one.</p>
+    <p>A different data seed gives a different curve. The default settings over data seeds 1, 2 and 3 end at 2.299, 2.354 and 2.178: mean &plusmn; standard deviation <strong>2.277 &plusmn; 0.090</strong> (results.md &sect;6a).</p>
+    <div class="callout">
+        <div class="callout-label">The rule every later deck follows</div>
+        <p>A difference smaller than the seed-to-seed spread is not a difference, and a result from a single seed is a hypothesis until it is repeated. Many of these runs are also <em>chaotic</em>: when the model leaves the plateau depends on the last bits of its arithmetic, so recomputing a run on another CPU moved single seeds&rsquo; final losses by up to about 0.35 (results.md, &ldquo;how to read these numbers&rdquo;). Every comparison in this series is three seeds, mean &plusmn; standard deviation.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>What the Model Writes</h2>
+    <p>Start from &ldquo;alice &rdquo;, predict a distribution over the next character, draw one at temperature 0.8 (as in <a href="https://transformer-decoder-explained.vercel.app/learn/07-sampling">Part 1&rsquo;s sampling chapter</a>), append it, repeat. Sampler seed 7, 120 characters (results.md &sect;4):</p>
+    <div class="code-block">
+        <div class="code-header">at initialisation</div>
+<pre><code>alice ae$(814q -rk+8nyt9t$q[mjkt +f{ ?&quot;$?}=clx2bg+y25@(&quot;wxjj{vm;wc&quot;} =:}i8:]#&lt;!$$ /a7v) 
+$ =2;- uqab@=;b?!)%s%:*?=j%7.k0o/&gt;-:%</code></pre>
+    </div>
+    <div class="code-block">
+        <div class="code-header">after 2,000 steps</div>
+<pre><code>alice ad, onle the pang hul cag soe she.&quot;
+&quot;ainnd the wos id welund wit war to srur ang poy the shecavt as twe, thok&quot; pand the;</code></pre>
+    </div>
+    <p>It has learnt spaces, common short words and punctuation, but not sense: with 8 characters of context and about five thousand weights, it cannot. Three steps of the loop teach the mechanism; a couple of thousand show the language arriving.</p>
+</section>
+
+<section class="slide" id="slide-10">
+    <div class="slide-number">10</div>
+    <h2>How the Trainer Is Checked</h2>
+    <p>The site&rsquo;s trainer is a NumPy reference with a <strong>hand-written backward pass</strong> (deck 03), checked against PyTorch, and a TypeScript port that trains in a Web Worker and replays the reference: the first 200 steps of the default run to 10<sup>&minus;9</sup>, the whole run to within 10<sup>&minus;7</sup> of the recorded weights.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Check (results.md &sect;3)</th><th>Measured max error</th><th>Tolerance</th></tr></thead>
+            <tbody>
+                <tr><td>Backward = PyTorch autograd (perturbed weights)</td><td>9.4&times;10<sup>&minus;17</sup> (relative)</td><td>10<sup>&minus;12</sup></td></tr>
+                <tr><td>Backward = central differences, 552 entries</td><td>7.6&times;10<sup>&minus;10</sup></td><td>10<sup>&minus;8</sup> + 10<sup>&minus;6</sup>|g|</td></tr>
+                <tr><td>SGD = torch.optim, 25 steps</td><td>0</td><td>10<sup>&minus;12</sup></td></tr>
+                <tr><td>Adam = torch.optim, 25 steps</td><td>2.2&times;10<sup>&minus;16</sup></td><td>10<sup>&minus;12</sup></td></tr>
+                <tr><td>AdamW = torch.optim, 25 steps</td><td>1.1&times;10<sup>&minus;16</sup></td><td>10<sup>&minus;12</sup></td></tr>
+                <tr><td>Cosine schedule = CosineAnnealingLR</td><td>3.5&times;10<sup>&minus;18</sup></td><td>10<sup>&minus;15</sup></td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>CI regenerates every fixture and result and fails on any difference beyond its stated rule, so a number on these slides is one the repository still reproduces.</p>
+</section>
+
+<section class="slide" id="slide-11">
+    <div class="slide-number">11</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li><strong>One step</strong> = batch &rarr; forward &rarr; loss &rarr; backward &rarr; update; everything else in this series is a refinement of one of those five.</li>
+        <li><strong>Teacher forcing</strong> scores every position of a window at once; the causal mask keeps it honest.</li>
+        <li><strong>Cross-entropy</strong> is minus the log probability of the truth; its gradient at the logits is \(p - y\).</li>
+        <li>Loss curves have <strong>plateaus</strong>: this one sits at the letter-frequency loss (3.00) for hundreds of steps before attention starts to pay.</li>
+        <li>Compare runs on <strong>validation</strong> loss, over <strong>several seeds</strong>.</li>
+    </ul>
+    <p class="live-link">Animated: <a href="https://transformer-decoder-explained.vercel.app/training/01-training-loop">chapter 1, the training loop</a> (the model trains live) &middot; <a href="https://transformer-decoder-explained.vercel.app/training/03-objective">chapter 3, the objective</a> &middot; next: <a href="https://brendanjameslynskey.github.io/Transformer_Training_02_Data_and_Tokenisation/">deck 02, data and tokenisation</a></p>
+</section>
+
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Transformer_Training">Transformer Training series</a> &middot; live, animated companion: <a href="https://transformer-decoder-explained.vercel.app/training/01-training-loop">chapter 1, The training loop</a> &middot; <a href="https://transformer-decoder-explained.vercel.app/training/03-objective">chapter 3, The objective</a> of <a href="https://transformer-decoder-explained.vercel.app/training">Transformer Decoder Explained, Part 2</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/LLM_Hub_Transformer_Training/">Series index</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/Transformer_Training_02_Data_and_Tokenisation/">02 Data &amp; Tokens &rarr;</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.75rem;">Measured numbers: <a href="https://github.com/BrendanJamesLynskey/transformer-explainer/blob/main/results.md">results.md</a> (transformer-explainer @15b1c9f). Code on these slides is cut from that repository.</p>
+</footer>
+<script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+</body>
+</html>
