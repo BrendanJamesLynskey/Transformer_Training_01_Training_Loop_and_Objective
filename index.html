@@ -498,7 +498,7 @@
     </ul>
     <div class="callout">
         <div class="callout-label">Live companion and sources</div>
-        <p>This deck follows <a href="https://transformer-training-explained.vercel.app/training/01-training-loop">chapter 1, the training loop</a> and <a href="https://transformer-training-explained.vercel.app/training/03-objective">chapter 3, the objective</a> of Transformer Decoder Explained, Part 2, where the same model trains in your browser. Every measured number here comes from the site&rsquo;s <a href="https://github.com/BrendanJamesLynskey/transformer-explainer/blob/main/results.md">results.md</a>: seeded runs of a NumPy reference trainer whose backward pass is checked against PyTorch.</p>
+        <p>This deck follows <a href="https://transformer-training-explained.vercel.app/training/01-training-loop">chapter 1, the training loop</a> and <a href="https://transformer-training-explained.vercel.app/training/03-objective">chapter 3, the objective</a> of the Training site, where the Decoder site&rsquo;s model trains in your browser. Every measured number here comes from the site&rsquo;s <a href="https://github.com/BrendanJamesLynskey/transformer-explainer/blob/main/results.md">results.md</a>: seeded runs of a NumPy reference trainer whose backward pass is checked against PyTorch.</p>
     </div>
 </section>
 
@@ -542,7 +542,7 @@
 <section class="slide" id="slide-02">
     <div class="slide-number">02</div>
     <h2>The Model and the Text It Trains On</h2>
-    <p>The model is Part 1&rsquo;s decoder, with the same random initial weights: the one <a href="https://transformer-decoder-explained.vercel.app/learn/01-overview">Part 1 of the site</a> runs for inference. Part 2 trains it.</p>
+    <p>The model is the Decoder site&rsquo;s, with the same random initial weights: the one <a href="https://transformer-decoder-explained.vercel.app/learn/01-overview">the Decoder site</a> runs one forward pass at a time. The Training site trains it.</p>
     <div class="diagram-grid cols-2">
         <div class="diagram-panel accent-border">
             <h4>The model (results.md &sect;2)</h4>
@@ -674,8 +674,8 @@
 <text class="lbl hl" x="450" y="37.1" text-anchor="end">uniform guess, ln 64</text>
 <line class="hline" x1="62" x2="454" y1="152.2" y2="152.2"/>
 <text class="lbl hl" x="450" y="148.2" text-anchor="end">letter frequencies only</text>
-<clipPath id="clip129418997604672"><rect x="62" y="18" width="392" height="230"/></clipPath>
-<g clip-path="url(#clip129418997604672)">
+<clipPath id="clip136114098679168"><rect x="62" y="18" width="392" height="230"/></clipPath>
+<g clip-path="url(#clip136114098679168)">
 <path class="ln s2" d="M62.0,39.7 L64.0,52.5 L65.9,98.3 L67.9,137.2 L69.8,161.2 L71.8,146.3 L73.8,147.5 L75.7,152.4 L77.7,150.9 L79.6,159.6 L81.6,162.5 L83.6,145.5 L85.5,140.2 L87.5,154.7 L89.4,151.5 L91.4,139.9 L93.4,156.5 L95.3,134.9 L97.3,151.9 L99.2,151.3 L101.2,156.7 L103.2,139.5 L105.1,160.2 L107.1,150.9 L109.0,154.4 L111.0,154.1 L113.0,144.3 L114.9,143.9 L116.9,147.0 L118.8,161.1 L120.8,163.5 L122.8,158.7 L124.7,148.7 L126.7,141.4 L128.6,155.4 L130.6,154.6 L132.6,148.0 L134.5,162.6 L136.5,135.2 L138.4,145.0 L140.4,152.4 L142.4,149.3 L144.3,142.4 L146.3,149.9 L148.2,150.1 L150.2,152.8 L152.2,161.4 L154.1,161.2 L156.1,157.6 L158.0,148.6 L160.0,138.9 L162.0,160.4 L163.9,144.0 L165.9,156.5 L167.8,150.4 L169.8,153.4 L171.8,151.3 L173.7,152.8 L175.7,151.0 L177.6,132.3 L179.6,145.4 L181.6,138.2 L183.5,156.0 L185.5,153.4 L187.4,167.9 L189.4,152.3 L191.4,171.2 L193.3,160.8 L195.3,149.5 L197.2,162.4 L199.2,133.6 L201.2,159.1 L203.1,148.2 L205.1,149.5 L207.0,159.4 L209.0,145.3 L211.0,148.7 L212.9,147.1 L214.9,160.2 L216.8,164.1 L218.8,158.8 L220.8,154.3 L222.7,156.7 L224.7,161.5 L226.6,154.6 L228.6,132.7 L230.6,150.2 L232.5,148.2 L234.5,136.8 L236.4,145.4 L238.4,167.5 L240.4,169.0 L242.3,156.7 L244.3,154.8 L246.2,169.4 L248.2,151.6 L250.2,177.0 L252.1,170.0 L254.1,162.8 L256.0,152.7 L258.0,168.1 L260.0,161.8 L261.9,166.2 L263.9,175.5 L265.8,178.7 L267.8,175.6 L269.8,178.6 L271.7,182.7 L273.7,191.5 L275.6,187.6 L277.6,191.6 L279.6,175.2 L281.5,181.4 L283.5,184.0 L285.4,179.0 L287.4,191.9 L289.4,186.1 L291.3,186.5 L293.3,189.5 L295.2,186.6 L297.2,194.2 L299.2,215.1 L301.1,181.4 L303.1,187.4 L305.0,190.3 L307.0,209.2 L309.0,187.7 L310.9,194.0 L312.9,212.5 L314.8,208.0 L316.8,189.9 L318.8,189.8 L320.7,196.4 L322.7,188.6 L324.6,210.8 L326.6,201.0 L328.6,202.9 L330.5,189.8 L332.5,187.8 L334.4,197.9 L336.4,190.6 L338.4,196.7 L340.3,207.2 L342.3,225.1 L344.2,207.6 L346.2,201.1 L348.2,207.5 L350.1,207.4 L352.1,204.7 L354.0,193.1 L356.0,201.1 L358.0,209.3 L359.9,211.6 L361.9,199.8 L363.8,197.0 L365.8,216.3 L367.8,207.7 L369.7,216.8 L371.7,228.3 L373.6,191.7 L375.6,198.3 L377.6,205.3 L379.5,209.1 L381.5,206.9 L383.4,209.7 L385.4,219.5 L387.4,182.5 L389.3,231.9 L391.3,198.8 L393.2,221.0 L395.2,199.6 L397.2,213.3 L399.1,209.7 L401.1,218.7 L403.0,205.6 L405.0,210.6 L407.0,208.0 L408.9,216.4 L410.9,205.6 L412.8,208.5 L414.8,216.6 L416.8,224.8 L418.7,219.4 L420.7,204.4 L422.6,206.1 L424.6,201.7 L426.6,199.5 L428.5,212.0 L430.5,207.7 L432.4,213.3 L434.4,208.2 L436.4,199.1 L438.3,222.8 L440.3,189.0 L442.2,216.2 L444.2,225.9 L446.2,219.2 L448.1,224.7 L450.1,232.7 L452.0,215.4 L453.8,212.9"/>
 <path class="ln s1" d="M62.0,39.3 L81.6,155.0 L101.2,157.5 L120.8,156.3 L140.4,156.1 L160.0,156.0 L179.6,156.8 L199.2,157.0 L218.8,156.5 L238.4,165.7 L258.0,173.5 L277.6,188.6 L297.2,203.4 L316.8,205.9 L336.4,209.8 L356.0,212.7 L375.6,214.4 L395.2,216.9 L414.8,217.3 L434.4,217.9 L454.0,219.3"/>
 <circle class="pt s1" cx="62.0" cy="39.3" r="3"/>
@@ -741,7 +741,7 @@
 <section class="slide" id="slide-08">
     <div class="slide-number">08</div>
     <h2>Seeds and Spread</h2>
-    <p>Everything random is seeded: the weights (seed 42, Part 1&rsquo;s), the order of the batches (data seed 1) and the sampler (seed 7). The same seeds give the same run on any machine, which is why the site&rsquo;s browser run lands on the recorded one.</p>
+    <p>Everything random is seeded: the weights (seed 42, the Decoder&rsquo;s), the order of the batches (data seed 1) and the sampler (seed 7). The same seeds give the same run on any machine, which is why the site&rsquo;s browser run lands on the recorded one.</p>
     <p>A different data seed gives a different curve. The default settings over data seeds 1, 2 and 3 end at 2.299, 2.354 and 2.178: mean &plusmn; standard deviation <strong>2.277 &plusmn; 0.090</strong> (results.md &sect;6a).</p>
     <div class="callout">
         <div class="callout-label">The rule every later deck follows</div>
@@ -752,7 +752,7 @@
 <section class="slide" id="slide-09">
     <div class="slide-number">09</div>
     <h2>What the Model Writes</h2>
-    <p>Start from &ldquo;alice &rdquo;, predict a distribution over the next character, draw one at temperature 0.8 (as in <a href="https://transformer-decoder-explained.vercel.app/learn/07-sampling">Part 1&rsquo;s sampling chapter</a>), append it, repeat. Sampler seed 7, 120 characters (results.md &sect;4):</p>
+    <p>Start from &ldquo;alice &rdquo;, predict a distribution over the next character, draw one at temperature 0.8 (as in <a href="https://transformer-decoder-explained.vercel.app/learn/07-sampling">the Decoder&rsquo;s sampling chapter</a>), append it, repeat. Sampler seed 7, 120 characters (results.md &sect;4):</p>
     <div class="code-block">
         <div class="code-header">at initialisation</div>
 <pre><code>alice ae$(814q -rk+8nyt9t$q[mjkt +f{ ?&quot;$?}=clx2bg+y25@(&quot;wxjj{vm;wc&quot;} =:}i8:]#&lt;!$$ /a7v) 
@@ -800,7 +800,7 @@ $ =2;- uqab@=;b?!)%s%:*?=j%7.k0o/&gt;-:%</code></pre>
 </section>
 
 <footer class="footer">
-    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Transformer_Training">Transformer Training series</a> &middot; live, animated companion: <a href="https://transformer-training-explained.vercel.app/training/01-training-loop">chapter 1, The training loop</a> &middot; <a href="https://transformer-training-explained.vercel.app/training/03-objective">chapter 3, The objective</a> of <a href="https://transformer-training-explained.vercel.app/training">Transformer Decoder Explained, Part 2</a></p>
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Transformer_Training">Transformer Training series</a> &middot; live, animated companion: <a href="https://transformer-training-explained.vercel.app/training/01-training-loop">chapter 1, The training loop</a> &middot; <a href="https://transformer-training-explained.vercel.app/training/03-objective">chapter 3, The objective</a> of the <a href="https://transformer-training-explained.vercel.app/training">Training</a> site</p>
     <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/LLM_Hub_Transformer_Training/">Series index</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/Transformer_Training_02_Data_and_Tokenisation/">02 Data &amp; Tokens &rarr;</a></p>
     <p style="margin-top: 0.5rem; font-size: 0.75rem;">Measured numbers: <a href="https://github.com/BrendanJamesLynskey/transformer-explainer/blob/main/results.md">results.md</a> (transformer-explainer @15b1c9f). Code on these slides is cut from that repository.</p>
 </footer>

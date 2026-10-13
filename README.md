@@ -8,7 +8,7 @@ The loop (batch, forward, loss, backward, update); next-token cross-entropy and 
 
 ## Live, animated companion
 
-This deck is the slide companion to Part 2 (Training) of [Transformer Decoder Explained](https://transformer-training-explained.vercel.app/training), where the same model trains in your browser:
+This deck is the slide companion to [Training](https://transformer-training-explained.vercel.app/training), the second site of the Foundations track (after Decoder), where the Decoder's model trains in your browser:
 
 - [Chapter 1: The training loop](https://transformer-training-explained.vercel.app/training/01-training-loop)
 - [Chapter 3: The objective](https://transformer-training-explained.vercel.app/training/03-objective)
